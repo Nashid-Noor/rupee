@@ -1,0 +1,34 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "rupee",
+  "main": "src/worker/index.ts",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*", "/mcp", "/mcp/*", "/authorize", "/oauth/*", "/.well-known/*"]
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "rupee",
+      // Replace with the id printed by the create command (see README → Deploy)
+      "database_id": "3234ad8a-6d1e-47c8-8669-ffba5b182bb0",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "OAUTH_KV",
+      // Replace with the id printed by the create command (see README → Deploy)
+      "id": "0871745e65054f1c842b26af049943ab"
+    }
+  ],
+  "vars": {
+    // Your public URL after the first deploy, e.g. https://rupee.<you>.workers.dev
+    "PUBLIC_URL": "http://localhost:8787"
+  },
+  "observability": { "enabled": true }
+}
