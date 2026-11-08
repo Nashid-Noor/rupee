@@ -28,7 +28,7 @@
   ],
   "vars": {
     // Your public URL after the first deploy, e.g. https://rupee.<you>.workers.dev
-    "PUBLIC_URL": "http://localhost:8787"
+    "PUBLIC_URL": "https://rupee.computronics2017py.workers.dev"
   },
   "observability": { "enabled": true }
 }

@@ -28,7 +28,7 @@ function getProvider(env: Env): OAuthProvider<Env> {
     resourceMetadata: {
       resource,
       authorization_servers: [base],
-      resource_name: 'Rupee household expenses',
+      resource_name: 'Rupee Flow household money',
     },
     // Personal access tokens (created in the PWA settings page) for clients
     // that take a URL plus an "Authorization: Bearer <token>" header.

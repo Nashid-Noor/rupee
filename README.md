@@ -1,23 +1,27 @@
-# Rupee — household expense tracker
+# Rupee Flow — household money tracker
 
-Track shared household spending as **needs**, **wants** or **investment**, in two ways:
+Track shared household **income** (salary, bonus, dividends, equity, PF, interest, rent) and **spending** as **needs**, **wants**, **investment** or **savings**, with tags and monthly caps set as a percentage of in-hand salary. Two ways in:
 
 - **PWA**: install it on your phone's home screen and add expenses with a simple form.
-- **Any AI assistant over MCP**: say *"spent ₹450 on dinner with friends"* and the assistant logs it and picks the category.
+- **Any AI assistant over MCP**: say *"spent ₹450 on dinner with friends"* or *"salary of ₹1.2L came in"* and the assistant logs it, picking the category and tags.
+
+**Caps:** set percentages in Settings (default needs 50 / wants 30 / investment 10 / savings 10). Each month, needs and wants are capped at that share of the month's in-hand salary, and investment and savings are targets to reach. If this month's salary isn't recorded yet, last month's is used (marked *estimated*). Caps warn, never block.
 
 Everything runs as one Cloudflare Worker on the free plan.
 
 ```
 PWA ── /api/* (session cookie) ──┐
-                                 ├─► service layer (src/worker/expenses.ts) ─► D1 (SQLite)
+                                 ├─► service layer (expenses / income / summary) ─► D1 (SQLite)
 AI  ── /mcp   (OAuth or token) ───┘
 ```
 
 | Path | What |
 |---|---|
 | `src/shared/schema.ts` | Validation (Zod), shared by the API, MCP tools and form |
-| `src/worker/expenses.ts` | All database access |
-| `src/worker/mcp.ts` | MCP tools: `add_expense`, `list_expenses`, `get_summary`, `update_expense`, `delete_expense` |
+| `src/worker/expenses.ts` | Expenses and tags |
+| `src/worker/income.ts` | Income |
+| `src/worker/summary.ts` | Caps settings, monthly summary and budget |
+| `src/worker/mcp.ts` | MCP tools: add/list/update/delete for expenses and income, `spending_by_tag`, `get_summary`, `set_caps` |
 | `src/worker/app.ts` | REST API, login, OAuth consent page |
 | `src/worker/index.ts` | Entry point; `OAuthProvider` protects `/mcp` |
 | `web/` | React PWA |
@@ -46,7 +50,7 @@ The local password is in `.dev.vars` (`local-dev-password`). For frontend hot-re
    npx wrangler d1 create rupee                 # → d1_databases[0].database_id
    npx wrangler kv namespace create OAUTH_KV    # → kv_namespaces[0].id
    ```
-3. Create the tables:
+3. Create the tables (run again after pulling changes that add a migration):
    ```sh
    npm run db:migrate:remote
    ```

@@ -3,7 +3,19 @@ import { AuthorizationError, CimdFetchError, type ConsentDescription } from '@cl
 import { Hono, type Context } from 'hono';
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import { z } from 'zod';
-import { expenseInput, expensePatch, listQuery, rangeQuery } from '../shared/schema';
+import {
+  APP_NAME,
+  CATEGORIES,
+  capsInput,
+  expenseInput,
+  expensePatch,
+  incomeInput,
+  incomeListQuery,
+  incomePatch,
+  isoDate,
+  listQuery,
+  rangeQuery,
+} from '../shared/schema';
 import {
   SESSION_COOKIE,
   checkPassword,
@@ -14,7 +26,9 @@ import {
   verifySession,
 } from './auth';
 import type { Env } from './env';
-import { addExpense, deleteExpense, getSummary, listExpenses, updateExpense } from './expenses';
+import { addExpense, deleteExpense, listExpenses, listTags, tagBreakdown, updateExpense } from './expenses';
+import { addIncome, deleteIncome, listIncome, updateIncome } from './income';
+import { getCaps, getSummary, setCaps } from './summary';
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -97,6 +111,54 @@ app.get('/api/summary', async (c) => {
   return c.json(await getSummary(c.env.DB, q.data));
 });
 
+// ---- Tags ------------------------------------------------------------------
+
+app.get('/api/tags', async (c) => c.json(await listTags(c.env.DB)));
+
+app.get('/api/tags/breakdown', async (c) => {
+  const q = z
+    .object({ from: isoDate.optional(), to: isoDate.optional(), category: z.enum(CATEGORIES).optional() })
+    .safeParse(c.req.query());
+  if (!q.success) return zodError(c, q.error);
+  return c.json(await tagBreakdown(c.env.DB, { ...q.data, limit: 12 }));
+});
+
+// ---- Income ----------------------------------------------------------------
+
+app.get('/api/incomes', async (c) => {
+  const q = incomeListQuery.safeParse(c.req.query());
+  if (!q.success) return zodError(c, q.error);
+  return c.json(await listIncome(c.env.DB, q.data));
+});
+
+app.post('/api/incomes', async (c) => {
+  const input = incomeInput.safeParse(await c.req.json().catch(() => null));
+  if (!input.success) return zodError(c, input.error);
+  return c.json(await addIncome(c.env.DB, input.data, 'web'), 201);
+});
+
+app.patch('/api/incomes/:id', async (c) => {
+  const patch = incomePatch.safeParse(await c.req.json().catch(() => null));
+  if (!patch.success) return zodError(c, patch.error);
+  const i = await updateIncome(c.env.DB, c.req.param('id'), patch.data);
+  return i ? c.json(i) : c.json({ error: 'Not found' }, 404);
+});
+
+app.delete('/api/incomes/:id', async (c) => {
+  const ok = await deleteIncome(c.env.DB, c.req.param('id'));
+  return ok ? c.json({ ok: true }) : c.json({ error: 'Not found' }, 404);
+});
+
+// ---- Caps ------------------------------------------------------------------
+
+app.get('/api/caps', async (c) => c.json(await getCaps(c.env.DB)));
+
+app.put('/api/caps', async (c) => {
+  const caps = capsInput.safeParse(await c.req.json().catch(() => null));
+  if (!caps.success) return zodError(c, caps.error);
+  return c.json(await setCaps(c.env.DB, caps.data));
+});
+
 // ---- Personal access tokens ------------------------------------------------
 
 app.get('/api/tokens', async (c) => c.json(await listApiTokens(c.env.DB)));
@@ -126,7 +188,7 @@ function authorizePage(d: ConsentDescription, handle: string, query: string, nee
     : 'This app registered itself, so its name is not verified.';
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Connect ${esc(d.clientName)} to Rupee</title>
+<title>Connect ${esc(d.clientName)} to ${APP_NAME}</title>
 <style>
   :root{--bg:#f6f5f1;--card:#fff;--fg:#1c1b19;--muted:#6b6862;--accent:#0f766e;--line:#e4e1da;--err:#b42318}
   @media (prefers-color-scheme:dark){:root{--bg:#141413;--card:#1e1d1b;--fg:#f0eee9;--muted:#a19d94;--accent:#2dd4bf;--line:#33312d;--err:#f97066}}
@@ -140,8 +202,8 @@ function authorizePage(d: ConsentDescription, handle: string, query: string, nee
   button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
   @media (prefers-color-scheme:dark){button.primary{color:#04201d}}
 </style></head><body><main class="card">
-<h1>Allow <strong>${esc(d.clientName)}</strong> to use Rupee?</h1>
-<p>${origin} It will be able to add, view, edit and delete your household expenses.</p>
+<h1>Allow <strong>${esc(d.clientName)}</strong> to use ${APP_NAME}?</h1>
+<p>${origin} It will be able to add, view, edit and delete your household expenses and income.</p>
 <p>Access will be sent to <strong>${esc(d.redirectHost)}</strong>.</p>
 ${d.redirectIsLoopback ? '<p class="warn">This sends access to an app on your computer. Continue only if you just started connecting from it.</p>' : ''}
 ${error ? `<p class="err">${esc(error)}</p>` : ''}

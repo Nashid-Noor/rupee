@@ -15,9 +15,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'apple-touch-icon-180x180.png'],
       manifest: {
-        name: 'Rupee — Household Expenses',
-        short_name: 'Rupee',
-        description: 'Track household spending as needs, wants and investment.',
+        name: 'Rupee Flow — Household Money',
+        short_name: 'Rupee Flow',
+        description: 'Track household income and spending as needs, wants and investment.',
         theme_color: '#0f766e',
         background_color: '#f6f5f1',
         display: 'standalone',

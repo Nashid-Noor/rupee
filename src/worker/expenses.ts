@@ -1,16 +1,6 @@
-// Service layer: the only code that touches the expenses table.
-// Both the REST API (PWA) and the MCP tools call these functions.
-import {
-  CATEGORIES,
-  type Category,
-  type Expense,
-  type ExpenseInput,
-  type ExpensePatch,
-  type ListQuery,
-  type Summary,
-  monthRange,
-  todayIST,
-} from '../shared/schema';
+// Expenses + their tags. The only code that touches the expenses / expense_tags tables.
+import type { Category, Expense, ExpenseData, ExpensePatch, ListQuery, TagTotal } from '../shared/schema';
+import { listQuery, todayIST } from '../shared/schema';
 
 interface Row {
   id: string;
@@ -21,10 +11,13 @@ interface Row {
   source: 'web' | 'mcp';
   created_at: string;
   updated_at: string | null;
+  tags: string | null; // comma-joined
 }
 
-const toPaise = (rupees: number) => Math.round(rupees * 100);
-const fromPaise = (paise: number) => paise / 100;
+export const toPaise = (rupees: number) => Math.round(rupees * 100);
+export const fromPaise = (paise: number) => paise / 100;
+
+const SELECT = `SELECT e.*, (SELECT group_concat(tag, ',') FROM (SELECT tag FROM expense_tags t WHERE t.expense_id = e.id ORDER BY tag)) AS tags FROM expenses e`;
 
 function toExpense(r: Row): Expense {
   return {
@@ -33,42 +26,54 @@ function toExpense(r: Row): Expense {
     description: r.description,
     category: r.category,
     date: r.spent_on,
+    tags: r.tags ? r.tags.split(',') : [],
     source: r.source,
     created_at: r.created_at,
     updated_at: r.updated_at,
   };
 }
 
-export async function addExpense(db: D1Database, input: ExpenseInput, source: 'web' | 'mcp'): Promise<Expense> {
-  const row = await db
-    .prepare(
-      `INSERT INTO expenses (id, amount_paise, description, category, spent_on, source)
-       VALUES (?, ?, ?, ?, ?, ?) RETURNING *`,
-    )
-    .bind(crypto.randomUUID(), toPaise(input.amount), input.description, input.category, input.date ?? todayIST(), source)
-    .first<Row>();
-  return toExpense(row!);
+function tagInserts(db: D1Database, id: string, tags: string[]) {
+  return tags.map((t) => db.prepare('INSERT OR IGNORE INTO expense_tags (expense_id, tag) VALUES (?, ?)').bind(id, t));
 }
 
 export async function getExpense(db: D1Database, id: string): Promise<Expense | null> {
-  const row = await db.prepare('SELECT * FROM expenses WHERE id = ?').bind(id).first<Row>();
+  const row = await db.prepare(`${SELECT} WHERE e.id = ?`).bind(id).first<Row>();
   return row ? toExpense(row) : null;
 }
 
-export async function listExpenses(db: D1Database, q: ListQuery): Promise<{ items: Expense[]; total: number }> {
+export async function addExpense(db: D1Database, input: ExpenseData, source: 'web' | 'mcp'): Promise<Expense> {
+  const id = crypto.randomUUID();
+  await db.batch([
+    db
+      .prepare('INSERT INTO expenses (id, amount_paise, description, category, spent_on, source) VALUES (?, ?, ?, ?, ?, ?)')
+      .bind(id, toPaise(input.amount), input.description, input.category, input.date ?? todayIST(), source),
+    ...tagInserts(db, id, input.tags ?? []),
+  ]);
+  return (await getExpense(db, id))!;
+}
+
+export async function listExpenses(db: D1Database, query: ListQuery): Promise<{ items: Expense[]; total: number }> {
+  const q = listQuery.parse(query);
   const where: string[] = [];
   const args: unknown[] = [];
-  if (q.from) (where.push('spent_on >= ?'), args.push(q.from));
-  if (q.to) (where.push('spent_on <= ?'), args.push(q.to));
-  if (q.category) (where.push('category = ?'), args.push(q.category));
-  if (q.search) (where.push("description LIKE ? ESCAPE '\\'"), args.push(`%${q.search.replace(/[\\%_]/g, '\\$&')}%`));
+  if (q.from) (where.push('e.spent_on >= ?'), args.push(q.from));
+  if (q.to) (where.push('e.spent_on <= ?'), args.push(q.to));
+  if (q.category) (where.push('e.category = ?'), args.push(q.category));
+  if (q.tag) (where.push('EXISTS (SELECT 1 FROM expense_tags t WHERE t.expense_id = e.id AND t.tag = ?)'), args.push(q.tag));
+  if (q.untagged) where.push('NOT EXISTS (SELECT 1 FROM expense_tags t WHERE t.expense_id = e.id)');
+  if (q.search) {
+    const like = `%${q.search.replace(/[\\%_]/g, '\\$&')}%`;
+    where.push(
+      "(e.description LIKE ? ESCAPE '\\' OR EXISTS (SELECT 1 FROM expense_tags t WHERE t.expense_id = e.id AND t.tag LIKE ? ESCAPE '\\'))",
+    );
+    args.push(like, like);
+  }
   const clause = where.length ? `WHERE ${where.join(' AND ')}` : '';
 
   const [rows, count] = await db.batch([
-    db
-      .prepare(`SELECT * FROM expenses ${clause} ORDER BY spent_on DESC, created_at DESC LIMIT ? OFFSET ?`)
-      .bind(...args, q.limit, q.offset),
-    db.prepare(`SELECT COUNT(*) AS n FROM expenses ${clause}`).bind(...args),
+    db.prepare(`${SELECT} ${clause} ORDER BY e.spent_on DESC, e.created_at DESC LIMIT ? OFFSET ?`).bind(...args, q.limit, q.offset),
+    db.prepare(`SELECT COUNT(*) AS n FROM expenses e ${clause}`).bind(...args),
   ]);
   return {
     items: (rows.results as Row[]).map(toExpense),
@@ -76,6 +81,7 @@ export async function listExpenses(db: D1Database, q: ListQuery): Promise<{ item
   };
 }
 
+/** `patch.tags`, when given, replaces the expense's tags. */
 export async function updateExpense(db: D1Database, id: string, patch: ExpensePatch): Promise<Expense | null> {
   const sets: string[] = [];
   const args: unknown[] = [];
@@ -83,54 +89,54 @@ export async function updateExpense(db: D1Database, id: string, patch: ExpensePa
   if (patch.description !== undefined) (sets.push('description = ?'), args.push(patch.description));
   if (patch.category !== undefined) (sets.push('category = ?'), args.push(patch.category));
   if (patch.date !== undefined) (sets.push('spent_on = ?'), args.push(patch.date));
-  if (!sets.length) return getExpense(db, id);
   sets.push("updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')");
-  const row = await db
-    .prepare(`UPDATE expenses SET ${sets.join(', ')} WHERE id = ? RETURNING *`)
-    .bind(...args, id)
-    .first<Row>();
-  return row ? toExpense(row) : null;
+
+  const exists = await db.prepare('SELECT 1 FROM expenses WHERE id = ?').bind(id).first();
+  if (!exists) return null;
+  await db.batch([
+    db.prepare(`UPDATE expenses SET ${sets.join(', ')} WHERE id = ?`).bind(...args, id),
+    ...(patch.tags !== undefined
+      ? [db.prepare('DELETE FROM expense_tags WHERE expense_id = ?').bind(id), ...tagInserts(db, id, patch.tags)]
+      : []),
+  ]);
+  return getExpense(db, id);
 }
 
 export async function deleteExpense(db: D1Database, id: string): Promise<boolean> {
-  const res = await db.prepare('DELETE FROM expenses WHERE id = ?').bind(id).run();
+  const [, res] = await db.batch([
+    db.prepare('DELETE FROM expense_tags WHERE expense_id = ?').bind(id),
+    db.prepare('DELETE FROM expenses WHERE id = ?').bind(id),
+  ]);
   return res.meta.changes > 0;
 }
 
-/** Totals per category. Defaults to the current month (India time). */
-export async function getSummary(db: D1Database, range: { from?: string; to?: string }): Promise<Summary> {
-  const month = monthRange(todayIST());
-  const from = range.from ?? month.from;
-  const to = range.to ?? (range.from ? todayIST() : month.to);
+/** All tags ever used, most used first. */
+export async function listTags(db: D1Database, limit = 100): Promise<{ tag: string; count: number }[]> {
+  const { results } = await db
+    .prepare('SELECT tag, COUNT(*) AS count FROM expense_tags GROUP BY tag ORDER BY count DESC, tag LIMIT ?')
+    .bind(limit)
+    .all<{ tag: string; count: number }>();
+  return results;
+}
+
+/** Spending per tag in a range. An expense with several tags counts under each. */
+export async function tagBreakdown(
+  db: D1Database,
+  q: { from?: string; to?: string; category?: Category; limit?: number },
+): Promise<TagTotal[]> {
+  const where: string[] = [];
+  const args: unknown[] = [];
+  if (q.from) (where.push('e.spent_on >= ?'), args.push(q.from));
+  if (q.to) (where.push('e.spent_on <= ?'), args.push(q.to));
+  if (q.category) (where.push('e.category = ?'), args.push(q.category));
   const { results } = await db
     .prepare(
-      `SELECT category, SUM(amount_paise) AS paise, COUNT(*) AS n
-       FROM expenses WHERE spent_on >= ? AND spent_on <= ? GROUP BY category`,
+      `SELECT t.tag, SUM(e.amount_paise) AS paise, COUNT(*) AS n
+       FROM expense_tags t JOIN expenses e ON e.id = t.expense_id
+       ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
+       GROUP BY t.tag ORDER BY paise DESC LIMIT ?`,
     )
-    .bind(from, to)
-    .all<{ category: Category; paise: number; n: number }>();
-
-  const totalPaise = results.reduce((s, r) => s + r.paise, 0);
-  const byCategory = Object.fromEntries(
-    CATEGORIES.map((c) => {
-      const r = results.find((x) => x.category === c);
-      const paise = r?.paise ?? 0;
-      return [
-        c,
-        {
-          total: fromPaise(paise),
-          count: r?.n ?? 0,
-          percent: totalPaise ? Math.round((paise / totalPaise) * 1000) / 10 : 0,
-        },
-      ];
-    }),
-  ) as Summary['byCategory'];
-
-  return {
-    from,
-    to,
-    total: fromPaise(totalPaise),
-    count: results.reduce((s, r) => s + r.n, 0),
-    byCategory,
-  };
+    .bind(...args, q.limit ?? 20)
+    .all<{ tag: string; paise: number; n: number }>();
+  return results.map((r) => ({ tag: r.tag, total: fromPaise(r.paise), count: r.n }));
 }
