@@ -429,7 +429,7 @@ function SummaryView({ s }: { s: Summary }) {
         <>
           <div className="budget-head">
             <span>
-              Caps on in-hand salary <strong>{formatINR(s.budget.salary)}</strong>
+              Caps on total income <strong>{formatINR(s.budget.income)}</strong>
             </span>
             {s.budget.estimated && <span className="badge">Estimated from last month</span>}
           </div>
@@ -491,7 +491,7 @@ function SummaryView({ s }: { s: Summary }) {
               </li>
             ))}
           </ul>
-          <p className="hint">Add this month’s salary (as Income) to see your caps.</p>
+          <p className="hint">Add this month’s income to see your caps.</p>
         </>
       )}
     </div>
@@ -840,7 +840,7 @@ function CapsSettings({ onAuthError }: { onAuthError: OnAuthError }) {
   return (
     <form onSubmit={save}>
       <p className="muted">
-        Percent of each month’s <strong>in-hand salary</strong>. Needs and Wants are caps to stay under; Investment and Savings are
+        Percent of each month’s <strong>total income</strong>. Needs and Wants are caps to stay under; Investment and Savings are
         targets to reach. You’ll be warned, never blocked.
       </p>
       <div className="caps-grid">

@@ -42,10 +42,10 @@ function statusFor(category: Category, used: number): CapStatus {
   return 'ok';
 }
 
-async function salaryPaise(db: D1Database, monthStart: string): Promise<number> {
+async function incomeTotalPaise(db: D1Database, monthStart: string): Promise<number> {
   const { from, to } = monthRange(monthStart);
   const row = await db
-    .prepare("SELECT COALESCE(SUM(amount_paise), 0) AS p FROM incomes WHERE type = 'salary' AND received_on BETWEEN ? AND ?")
+    .prepare('SELECT COALESCE(SUM(amount_paise), 0) AS p FROM incomes WHERE received_on BETWEEN ? AND ?')
     .bind(from, to)
     .first<{ p: number }>();
   return row?.p ?? 0;
@@ -97,20 +97,28 @@ export async function getSummary(db: D1Database, range: { from?: string; to?: st
   // Budget only makes sense for one whole calendar month.
   let budget: Budget | null = null;
   if (from.endsWith('-01') && monthRange(from).to === to) {
-    let salary = incomeRows.find((r) => r.type === 'salary')?.paise ?? 0;
-    let salaryMonth = from;
-    if (!salary) {
-      salaryMonth = shiftMonth(from, -1);
-      salary = await salaryPaise(db, salaryMonth);
+    // Caps are based on the month's total income. Until this month's salary is in,
+    // a few small credits would make the caps misleadingly tiny, so estimate from
+    // last month's total instead (falling back to this month's if last month had none).
+    const hasSalary = incomeRows.some((r) => r.type === 'salary');
+    let base = hasSalary ? incomePaise : 0;
+    let baseMonth = from;
+    if (!base) {
+      baseMonth = shiftMonth(from, -1);
+      base = await incomeTotalPaise(db, baseMonth);
     }
-    if (salary) {
+    if (!base && incomePaise) {
+      baseMonth = from;
+      base = incomePaise;
+    }
+    if (base) {
       budget = {
-        salary: fromPaise(salary),
-        salaryMonth: salaryMonth.slice(0, 7),
-        estimated: salaryMonth !== from,
+        income: fromPaise(base),
+        incomeMonth: baseMonth.slice(0, 7),
+        estimated: baseMonth !== from,
         byCategory: Object.fromEntries(
           CATEGORIES.map((c) => {
-            const limitPaise = Math.round((salary * caps[c]) / 100);
+            const limitPaise = Math.round((base * caps[c]) / 100);
             const spent = catPaise(c);
             const used = limitPaise ? round1((spent / limitPaise) * 100) : spent ? 999 : isTarget(c) ? 100 : 0;
             return [

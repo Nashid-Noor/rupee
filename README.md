@@ -1,11 +1,11 @@
 # Rupee Flow — household money tracker
 
-Track shared household **income** (salary, bonus, dividends, equity, PF, interest, rent) and **spending** as **needs**, **wants**, **investment** or **savings**, with tags and monthly caps set as a percentage of in-hand salary. Two ways in:
+Track shared household **income** (salary, bonus, dividends, equity, interest, rent) and **spending** as **needs**, **wants**, **investment** or **savings**, with tags and monthly caps set as a percentage of total monthly income. Two ways in:
 
 - **PWA**: install it on your phone's home screen and add expenses with a simple form.
 - **Any AI assistant over MCP**: say *"spent ₹450 on dinner with friends"* or *"salary of ₹1.2L came in"* and the assistant logs it, picking the category and tags.
 
-**Caps:** set percentages in Settings (default needs 50 / wants 30 / investment 10 / savings 10). Each month, needs and wants are capped at that share of the month's in-hand salary, and investment and savings are targets to reach. If this month's salary isn't recorded yet, last month's is used (marked *estimated*). Caps warn, never block.
+**Caps:** set percentages in Settings (default needs 50 / wants 30 / investment 10 / savings 10). Each month, needs and wants are capped at that share of the month's total income (salary plus bonus, dividends, interest, rent, etc.), and investment and savings are targets to reach. If this month's salary isn't recorded yet, last month's total income is used (marked *estimated*). Caps warn, never block.
 
 Everything runs as one Cloudflare Worker on the free plan.
 

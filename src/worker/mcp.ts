@@ -36,14 +36,14 @@ const CATEGORY_GUIDE = `Choose the category yourself from the description:
 If it is genuinely ambiguous, pick the closest fit and mention your choice so the user can correct it.`;
 
 const INCOME_GUIDE = `Income types:
-- "salary": monthly in-hand salary credited to the bank (after tax and PF deductions). Spending caps are based on this.
+- "salary": monthly in-hand salary credited to the bank (after tax and PF deductions).
 - "bonus": bonuses, incentives, variable pay.
 - "dividend": dividends from stocks or mutual funds.
 - "equity": profit/proceeds from selling stocks, mutual funds or ESOPs.
-- "pf": EPF/PPF/NPS withdrawals or interest actually received.
 - "interest": savings account, FD/RD interest.
 - "rent": rental income.
-- "other": gifts received, refunds, freelance, anything else.`;
+- "other": gifts received, refunds, freelance, EPF/PPF/NPS withdrawals, anything else.
+PF contributions and PF interest credited to the PF account are NOT income — don't log them.`;
 
 function tagGuide(existing: string[]): string {
   const base =
@@ -111,13 +111,13 @@ function summaryText(s: Summary): string {
   if (s.budget) {
     lines.push(
       '',
-      `Caps (${s.caps.needs}% needs / ${s.caps.wants}% wants; targets ${s.caps.investment}% investment / ${s.caps.savings}% savings) based on in-hand salary ${formatINR(s.budget.salary)}${
-        s.budget.estimated ? ` from ${s.budget.salaryMonth} (this month's salary not recorded yet — estimated)` : ''
+      `Caps (${s.caps.needs}% needs / ${s.caps.wants}% wants; targets ${s.caps.investment}% investment / ${s.caps.savings}% savings) based on total income ${formatINR(s.budget.income)}${
+        s.budget.estimated ? ` from ${s.budget.incomeMonth} (this month's salary not recorded yet — estimated)` : ''
       }:`,
       ...CATEGORIES.map((c) => `- ${capLine(s, c)}`),
     );
   } else if (s.from.endsWith('-01') && monthRange(s.from).to === s.to) {
-    lines.push('', 'Caps: no salary recorded for this or last month, so caps cannot be calculated.');
+    lines.push('', 'Caps: no income recorded for this or last month, so caps cannot be calculated.');
   }
   return lines.join('\n');
 }
@@ -129,7 +129,7 @@ export async function createMcpServer(env: Env): Promise<McpServer> {
     {
       instructions: `${APP_NAME} is a shared household money tracker. All amounts are Indian Rupees (INR). Today's date in India is ${todayIST()}.
 Use add_expense when the user mentions spending money and add_income when they mention receiving money.
-Spending caps are percentages of the month's in-hand salary: needs and wants are caps (stay under), investment and savings are targets (reach them).
+Spending caps are percentages of the month's total income (all income types): needs and wants are caps (stay under), investment and savings are targets (reach them).
 ${CATEGORY_GUIDE}
 ${tagGuide(existingTags)}`,
     },
@@ -352,7 +352,7 @@ ${tagGuide(existingTags)}`,
     {
       title: 'Set spending caps',
       description:
-        'Set the monthly split as percentages of in-hand salary: needs and wants are caps, investment and savings are targets. They must add up to 100 or less. Confirm the numbers with the user before changing them.',
+        'Set the monthly split as percentages of total monthly income: needs and wants are caps, investment and savings are targets. They must add up to 100 or less. Confirm the numbers with the user before changing them.',
       inputSchema: {
         needs: z.number().min(0).max(100),
         wants: z.number().min(0).max(100),
@@ -365,7 +365,7 @@ ${tagGuide(existingTags)}`,
       const parsed = capsInput.safeParse(args);
       if (!parsed.success) return validationError(parsed.error);
       const c = await setCaps(env.DB, parsed.data);
-      return text(`Caps set: needs ${c.needs}%, wants ${c.wants}%, investment target ${c.investment}%, savings target ${c.savings}% of in-hand salary.`);
+      return text(`Caps set: needs ${c.needs}%, wants ${c.wants}%, investment target ${c.investment}%, savings target ${c.savings}% of total income.`);
     },
   );
 

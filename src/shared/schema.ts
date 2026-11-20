@@ -19,7 +19,7 @@ export const CATEGORY_LABELS: Record<Category, string> = {
 
 // ---- Income types -------------------------------------------------------------
 
-export const INCOME_TYPES = ['salary', 'bonus', 'dividend', 'equity', 'pf', 'interest', 'rent', 'other'] as const;
+export const INCOME_TYPES = ['salary', 'bonus', 'dividend', 'equity', 'interest', 'rent', 'other'] as const;
 export type IncomeType = (typeof INCOME_TYPES)[number];
 
 export const INCOME_TYPE_LABELS: Record<IncomeType, string> = {
@@ -27,7 +27,6 @@ export const INCOME_TYPE_LABELS: Record<IncomeType, string> = {
   bonus: 'Bonus',
   dividend: 'Dividend',
   equity: 'Equity',
-  pf: 'PF',
   interest: 'Interest',
   rent: 'Rent',
   other: 'Other',
@@ -143,7 +142,7 @@ export interface Income {
   updated_at: string | null;
 }
 
-// ---- Budget caps (percent of in-hand salary) ----------------------------------------
+// ---- Budget caps (percent of total monthly income) ----------------------------------
 
 const percent = z.number().min(0).max(100);
 export const capsInput = z
@@ -164,9 +163,9 @@ export interface CategoryBudget {
 }
 
 export interface Budget {
-  salary: number; // in-hand salary the caps are based on
-  salaryMonth: string; // YYYY-MM the salary came from
-  estimated: boolean; // true when using last month's salary
+  income: number; // total income the caps are based on
+  incomeMonth: string; // YYYY-MM that income came from
+  estimated: boolean; // true when using last month's income (this month's salary not in yet)
   byCategory: Record<Category, CategoryBudget>;
 }
 
@@ -186,7 +185,7 @@ export interface Summary {
   income: { total: number; count: number; byType: Partial<Record<IncomeType, number>> };
   saved: number; // income − spent
   caps: Caps;
-  /** Present for whole calendar months that have (this or last month's) salary. */
+  /** Present for whole calendar months that have (this or last month's) income. */
   budget: Budget | null;
 }
 
