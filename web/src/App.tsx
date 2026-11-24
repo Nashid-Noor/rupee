@@ -268,7 +268,7 @@ function Home({ onAuthError }: { onAuthError: OnAuthError }) {
             ›
           </button>
         </div>
-        {summary ? <SummaryView s={summary} /> : <div className="skeleton" />}
+        {summary ? <SummaryView key={summary.from} s={summary} /> : <div className="skeleton" />}
       </section>
 
       {topTags.length > 0 && (
@@ -401,40 +401,52 @@ function Home({ onAuthError }: { onAuthError: OnAuthError }) {
 // ---- Summary -------------------------------------------------------------------
 
 function SummaryView({ s }: { s: Summary }) {
-  const incomeTypes = Object.entries(s.income.byType) as [IncomeType, number][];
+  const [showAllIncome, setShowAllIncome] = useState(false);
+  const sources = (Object.entries(s.income.byType) as [IncomeType, number][])
+    .sort((a, b) => b[1] - a[1])
+    .map(([t, v]) => `${INCOME_TYPE_LABELS[t]} ${formatINR(v)}`);
+  const collapsed = sources.length > 2 && !showAllIncome;
+
   return (
     <div className="summary">
       <div className="stats">
         <div>
           <span className="muted">Income</span>
           <strong className="income-amt">{formatINR(s.income.total)}</strong>
+          {sources.length === 0 ? (
+            <small className="stat-note">None added yet</small>
+          ) : (
+            <>
+              {(collapsed ? sources.slice(0, 1) : sources).map((line) => (
+                <small key={line} className="stat-note">
+                  {line}
+                </small>
+              ))}
+              {sources.length > 2 && (
+                <button type="button" className="link-btn stat-note" onClick={() => setShowAllIncome(!showAllIncome)}>
+                  {collapsed ? `+${sources.length - 1} more` : 'Show less'}
+                </button>
+              )}
+            </>
+          )}
         </div>
         <div>
           <span className="muted">Spent</span>
           <strong>{formatINR(s.spent)}</strong>
+          <small className="stat-note">Needs + Wants</small>
+          {s.dailyAverage && <small className="stat-note">≈ {formatINR(Math.round(s.dailyAverage.amount))}/day</small>}
         </div>
         <div>
           <span className="muted">Invested &amp; saved</span>
           <strong>{formatINR(s.invested)}</strong>
+          <small className="stat-note">Investment + Savings</small>
         </div>
         <div>
           <span className="muted">Left over</span>
           <strong className={s.saved < 0 ? 'neg' : ''}>{formatINR(s.saved)}</strong>
+          <small className="stat-note">{s.saved < 0 ? 'More than income' : 'Not spent or saved'}</small>
         </div>
       </div>
-
-      {s.dailyAverage && (
-        <p className="daily-avg">
-          Avg/day <strong>{formatINR(Math.round(s.dailyAverage.amount))}</strong> · Needs + Wants over {s.dailyAverage.days}{' '}
-          {s.dailyAverage.days === 1 ? 'day' : 'days'}
-        </p>
-      )}
-
-      {incomeTypes.length > 0 && (
-        <p className="income-split">
-          {incomeTypes.map(([t, v]) => `${INCOME_TYPE_LABELS[t]} ${formatINR(v)}`).join(' · ')}
-        </p>
-      )}
 
       {s.budget ? (
         <>

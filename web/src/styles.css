@@ -166,7 +166,7 @@ label { display: block; font-size: 0.85rem; font-weight: 600; margin: 10px 0 4px
   background: none; border: 0; border-bottom: 1px solid var(--line); padding: 12px 2px;
 }
 .day li:last-child .row { border-bottom: 0; }
-.desc { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.desc { flex: 1; min-width: 0; overflow-wrap: break-word; }
 .desc small { display: block; color: var(--muted); font-size: 0.8rem; }
 .amt { font-weight: 650; font-variant-numeric: tabular-nums; white-space: nowrap; }
 
@@ -191,7 +191,7 @@ label { display: block; font-size: 0.85rem; font-weight: 600; margin: 10px 0 4px
 .copy-row { display: flex; gap: 8px; align-items: stretch; }
 .copy-row code {
   flex: 1; min-width: 0; padding: 10px 12px; border-radius: 10px; background: var(--field);
-  border: 1px solid var(--line); overflow-wrap: anywhere;
+  border: 1px solid var(--line); overflow-wrap: break-word;
 }
 .copy-row button { border: 1px solid var(--line); background: var(--card); border-radius: 10px; padding: 0 14px; font-weight: 600; }
 .fresh {
@@ -243,17 +243,17 @@ label { display: block; font-size: 0.85rem; font-weight: 600; margin: 10px 0 4px
   font-size: 0.8rem; color: var(--muted);
 }
 
-.stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px 8px; margin-bottom: 8px; }
+.stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px 10px; align-items: start; margin-bottom: 14px; }
 @media (min-width: 560px) { .stats { grid-template-columns: repeat(4, 1fr); } }
 .stats div { display: flex; flex-direction: column; min-width: 0; }
 .stats span { font-size: 0.8rem; }
 .stats strong { font-size: clamp(0.95rem, 4.3vw, 1.25rem); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; white-space: nowrap; }
+.stat-note { display: block; font-size: 0.75rem; line-height: 1.35; color: var(--muted); font-variant-numeric: tabular-nums; min-width: 0; overflow-wrap: break-word; }
+.stats strong + .stat-note { margin-top: 2px; }
+.link-btn { background: none; border: 0; padding: 0; text-align: left; color: var(--accent); }
+.stat-note.link-btn { color: var(--accent); }
 .income-amt { color: var(--income); }
 .neg { color: var(--danger); }
-.income-split { font-size: 0.82rem; color: var(--muted); margin: 0 0 14px; }
-.daily-avg { font-size: 0.82rem; color: var(--muted); margin: 0 0 14px; font-variant-numeric: tabular-nums; }
-.daily-avg strong { color: var(--fg); }
-.daily-avg + .income-split { margin-top: -10px; }
 
 .budget-head { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; font-size: 0.85rem; color: var(--muted); margin: 14px 0 10px; }
 .budget-head strong { color: var(--fg); }
