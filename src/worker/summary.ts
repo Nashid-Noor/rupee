@@ -92,6 +92,16 @@ export async function getSummary(db: D1Database, range: { from?: string; to?: st
     }),
   ) as Summary['byCategory'];
 
+  // Spending (caps) vs money kept (targets: investment + savings).
+  const spentOnlyPaise = CATEGORIES.filter((c) => !isTarget(c)).reduce((s, c) => s + catPaise(c), 0);
+  const investedPaise = CATEGORIES.filter(isTarget).reduce((s, c) => s + catPaise(c), 0);
+
+  // Average day-to-day spend (needs + wants) over the days elapsed so far.
+  const today = todayIST();
+  const end = to < today ? to : today;
+  const days = Math.round((Date.parse(`${end}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000) + 1;
+  const dailyAverage = days >= 1 ? { amount: round2(fromPaise(spentOnlyPaise) / days), days } : null;
+
   const caps = await getCaps(db);
 
   // Budget only makes sense for one whole calendar month.
@@ -141,6 +151,8 @@ export async function getSummary(db: D1Database, range: { from?: string; to?: st
     from,
     to,
     total: fromPaise(spentPaise),
+    spent: fromPaise(spentOnlyPaise),
+    invested: fromPaise(investedPaise),
     count: spendRows.reduce((s, r) => s + r.n, 0),
     byCategory,
     income: {
@@ -149,6 +161,7 @@ export async function getSummary(db: D1Database, range: { from?: string; to?: st
       byType: Object.fromEntries(incomeRows.map((r) => [r.type, fromPaise(r.paise)])),
     },
     saved: fromPaise(incomePaise - spentPaise),
+    dailyAverage,
     caps,
     budget,
   };

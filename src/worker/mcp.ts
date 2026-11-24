@@ -100,12 +100,17 @@ function summaryText(s: Summary): string {
             .join(', ')})`
         : ''
     }`,
-    `Spent: ${formatINR(s.total)} across ${s.count} expenses`,
-    `Left over (income − everything spent, invested and saved): ${formatINR(s.saved)}`,
+    `Spent (needs + wants): ${formatINR(s.spent)}`,
+    `Invested & saved (investment + savings): ${formatINR(s.invested)}`,
+    `Total outflow: ${formatINR(s.total)} across ${s.count} entries`,
+    ...(s.dailyAverage
+      ? [`Average daily spend (needs + wants): ${formatINR(s.dailyAverage.amount)}/day over ${s.dailyAverage.days} days`]
+      : []),
+    `Left over (income − spent − invested & saved): ${formatINR(s.saved)}`,
     '',
-    'Spending by category:',
+    'By category:',
     ...CATEGORIES.map(
-      (c) => `- ${c}: ${formatINR(s.byCategory[c].total)} (${s.byCategory[c].percent}% of spending, ${s.byCategory[c].count} entries)`,
+      (c) => `- ${c}: ${formatINR(s.byCategory[c].total)} (${s.byCategory[c].percent}% of outflow, ${s.byCategory[c].count} entries)`,
     ),
   ];
   if (s.budget) {

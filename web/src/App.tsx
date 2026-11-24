@@ -411,13 +411,24 @@ function SummaryView({ s }: { s: Summary }) {
         </div>
         <div>
           <span className="muted">Spent</span>
-          <strong>{formatINR(s.total)}</strong>
+          <strong>{formatINR(s.spent)}</strong>
+        </div>
+        <div>
+          <span className="muted">Invested &amp; saved</span>
+          <strong>{formatINR(s.invested)}</strong>
         </div>
         <div>
           <span className="muted">Left over</span>
           <strong className={s.saved < 0 ? 'neg' : ''}>{formatINR(s.saved)}</strong>
         </div>
       </div>
+
+      {s.dailyAverage && (
+        <p className="daily-avg">
+          Avg/day <strong>{formatINR(Math.round(s.dailyAverage.amount))}</strong> · Needs + Wants over {s.dailyAverage.days}{' '}
+          {s.dailyAverage.days === 1 ? 'day' : 'days'}
+        </p>
+      )}
 
       {incomeTypes.length > 0 && (
         <p className="income-split">
@@ -472,7 +483,7 @@ function SummaryView({ s }: { s: Summary }) {
         </>
       ) : (
         <>
-          <div className="bar" role="img" aria-label="Spending split by category">
+          <div className="bar" role="img" aria-label="Split by category">
             {s.total > 0 ? (
               CATEGORIES.map((c) =>
                 s.byCategory[c].total > 0 ? <span key={c} className={`c-${c}`} style={{ flexGrow: s.byCategory[c].total }} /> : null,

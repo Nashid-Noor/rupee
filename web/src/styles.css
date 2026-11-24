@@ -243,13 +243,17 @@ label { display: block; font-size: 0.85rem; font-weight: 600; margin: 10px 0 4px
   font-size: 0.8rem; color: var(--muted);
 }
 
-.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 8px; }
+.stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px 8px; margin-bottom: 8px; }
+@media (min-width: 560px) { .stats { grid-template-columns: repeat(4, 1fr); } }
 .stats div { display: flex; flex-direction: column; min-width: 0; }
 .stats span { font-size: 0.8rem; }
 .stats strong { font-size: clamp(0.95rem, 4.3vw, 1.25rem); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; white-space: nowrap; }
 .income-amt { color: var(--income); }
 .neg { color: var(--danger); }
 .income-split { font-size: 0.82rem; color: var(--muted); margin: 0 0 14px; }
+.daily-avg { font-size: 0.82rem; color: var(--muted); margin: 0 0 14px; font-variant-numeric: tabular-nums; }
+.daily-avg strong { color: var(--fg); }
+.daily-avg + .income-split { margin-top: -10px; }
 
 .budget-head { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; font-size: 0.85rem; color: var(--muted); margin: 14px 0 10px; }
 .budget-head strong { color: var(--fg); }

@@ -179,11 +179,15 @@ export const rangeQuery = z.object({
 export interface Summary {
   from: string;
   to: string;
-  total: number; // total spent
+  total: number; // all outflow: spent + invested
+  spent: number; // needs + wants (actual spending)
+  invested: number; // investment + savings (money kept, not spent)
   count: number;
   byCategory: Record<Category, { total: number; count: number; percent: number }>;
   income: { total: number; count: number; byType: Partial<Record<IncomeType, number>> };
-  saved: number; // income − spent
+  saved: number; // left over: income − total
+  /** Needs + wants spending ÷ days elapsed in the range (capped at today). null if the range is entirely in the future. */
+  dailyAverage: { amount: number; days: number } | null;
   caps: Caps;
   /** Present for whole calendar months that have (this or last month's) income. */
   budget: Budget | null;
