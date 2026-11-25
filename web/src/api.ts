@@ -1,5 +1,7 @@
 import type {
   Caps,
+  CompareRow,
+  ComparePeriod,
   Expense,
   ExpenseInput,
   Income,
@@ -51,6 +53,7 @@ export const api = {
   removeIncome: (id: string) => req(`/api/incomes/${id}`, { method: 'DELETE' }),
 
   summary: (from: string, to: string) => req<Summary>(`/api/summary?${qs({ from, to })}`),
+  compare: (period: ComparePeriod) => req<CompareRow[]>(`/api/compare?${qs({ period })}`),
   tags: () => req<{ tag: string; count: number }[]>('/api/tags'),
   tagBreakdown: (from: string, to: string) => req<TagTotal[]>(`/api/tags/breakdown?${qs({ from, to })}`),
 

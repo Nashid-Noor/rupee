@@ -220,6 +220,73 @@ export function shiftMonth(monthStart: string, delta: number): string {
   return new Date(Date.UTC(y, m - 1 + delta, 1)).toISOString().slice(0, 10);
 }
 
+/** Monday–Sunday week containing `date`. */
+export function weekRange(date: string): { from: string; to: string } {
+  const d = new Date(`${date}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
+  const from = d.toISOString().slice(0, 10);
+  d.setUTCDate(d.getUTCDate() + 6);
+  return { from, to: d.toISOString().slice(0, 10) };
+}
+
+/** Week start shifted by `delta` weeks. */
+export function shiftWeek(weekStart: string, delta: number): string {
+  const d = new Date(`${weekStart}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + delta * 7);
+  return d.toISOString().slice(0, 10);
+}
+
+/** First and last day of the year containing `date`. */
+export function yearRange(date: string): { from: string; to: string } {
+  const y = date.slice(0, 4);
+  return { from: `${y}-01-01`, to: `${y}-12-31` };
+}
+
+/** Year start shifted by `delta` years. */
+export function shiftYear(yearStart: string, delta: number): string {
+  return `${Number(yearStart.slice(0, 4)) + delta}-01-01`;
+}
+
+// ---- Period comparison ---------------------------------------------------------------
+
+export const COMPARE_PERIODS = ['week', 'month', 'year'] as const;
+export type ComparePeriod = (typeof COMPARE_PERIODS)[number];
+
+export const compareQuery = z.object({
+  period: z.enum(COMPARE_PERIODS).default('month'),
+  count: z.coerce.number().int().min(2).max(24).optional(),
+});
+
+export const DEFAULT_COMPARE_COUNT: Record<ComparePeriod, number> = { week: 8, month: 6, year: 3 };
+
+export function periodRange(period: ComparePeriod, date: string): { from: string; to: string } {
+  return period === 'week' ? weekRange(date) : period === 'month' ? monthRange(date) : yearRange(date);
+}
+
+export function shiftPeriod(period: ComparePeriod, start: string, delta: number): string {
+  return period === 'week' ? shiftWeek(start, delta) : period === 'month' ? shiftMonth(start, delta) : shiftYear(start, delta);
+}
+
+export interface CompareRow {
+  from: string;
+  to: string;
+  income: number;
+  spent: number; // needs + wants
+  invested: number; // investment + savings
+  saved: number; // income − spent − invested
+  partial: boolean; // the current, unfinished period
+}
+
+/** 1250 → ₹1.3k, 125000 → ₹1.25L, 12500000 → ₹1.25Cr. For tight spaces like chart axes. */
+export function compactINR(n: number): string {
+  const a = Math.abs(n);
+  const f = (v: number, u: string) => `${n < 0 ? '-' : ''}₹${Number(v.toFixed(2))}${u}`;
+  if (a >= 1e7) return f(a / 1e7, 'Cr');
+  if (a >= 1e5) return f(a / 1e5, 'L');
+  if (a >= 1e3) return f(a / 1e3, 'k');
+  return f(a, '');
+}
+
 export function formatINR(amount: number): string {
   return new Intl.NumberFormat('en-IN', {
     style: 'currency',

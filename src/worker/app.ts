@@ -7,6 +7,7 @@ import {
   APP_NAME,
   CATEGORIES,
   capsInput,
+  compareQuery,
   expenseInput,
   expensePatch,
   incomeInput,
@@ -28,6 +29,7 @@ import {
 import type { Env } from './env';
 import { addExpense, deleteExpense, listExpenses, listTags, tagBreakdown, updateExpense } from './expenses';
 import { addIncome, deleteIncome, listIncome, updateIncome } from './income';
+import { getComparison } from './compare';
 import { getCaps, getSummary, setCaps } from './summary';
 
 const app = new Hono<{ Bindings: Env }>();
@@ -109,6 +111,12 @@ app.get('/api/summary', async (c) => {
   const q = rangeQuery.safeParse(c.req.query());
   if (!q.success) return zodError(c, q.error);
   return c.json(await getSummary(c.env.DB, q.data));
+});
+
+app.get('/api/compare', async (c) => {
+  const q = compareQuery.safeParse(c.req.query());
+  if (!q.success) return zodError(c, q.error);
+  return c.json(await getComparison(c.env.DB, q.data.period, q.data.count));
 });
 
 // ---- Tags ------------------------------------------------------------------

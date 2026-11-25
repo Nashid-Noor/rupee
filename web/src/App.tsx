@@ -8,6 +8,9 @@ import {
   INCOME_TYPE_LABELS,
   type Caps,
   type Category,
+  type ComparePeriod,
+  type CompareRow,
+  COMPARE_PERIODS,
   type Expense,
   type ExpenseInput,
   type Income,
@@ -15,6 +18,7 @@ import {
   type IncomeType,
   type Summary,
   type TagTotal,
+  compactINR,
   formatINR,
   monthRange,
   normalizeTag,
@@ -23,7 +27,7 @@ import {
 } from '../../src/shared/schema';
 import { api, AuthError, type ApiToken } from './api';
 
-type View = 'home' | 'settings';
+type View = 'home' | 'compare' | 'settings';
 type OnAuthError = (e: unknown) => void;
 
 export function App() {
@@ -57,16 +61,25 @@ export function App() {
           <img src="/favicon.svg" alt="" width={28} height={28} />
           <span>{APP_NAME}</span>
         </button>
-        <button
-          className="icon-btn"
-          aria-label={view === 'home' ? 'Settings' : 'Back'}
-          onClick={() => setView(view === 'home' ? 'settings' : 'home')}
-        >
-          {view === 'home' ? <GearIcon /> : <CloseIcon />}
-        </button>
+        <div className="top-actions">
+          {view === 'home' && (
+            <button className="icon-btn" aria-label="Compare periods" onClick={() => setView('compare')}>
+              <ChartIcon />
+            </button>
+          )}
+          <button
+            className="icon-btn"
+            aria-label={view === 'home' ? 'Settings' : 'Back'}
+            onClick={() => setView(view === 'home' ? 'settings' : 'home')}
+          >
+            {view === 'home' ? <GearIcon /> : <CloseIcon />}
+          </button>
+        </div>
       </header>
       {view === 'home' ? (
         <Home onAuthError={onAuthError} />
+      ) : view === 'compare' ? (
+        <Compare onAuthError={onAuthError} />
       ) : (
         <Settings mcpUrl={mcpUrl} onAuthError={onAuthError} onLogout={() => setState('out')} />
       )}
@@ -1009,7 +1022,218 @@ function Settings({ mcpUrl, onAuthError, onLogout }: { mcpUrl: string; onAuthErr
   );
 }
 
+// ---- Compare -----------------------------------------------------------------
+
+const PERIOD_LABELS: Record<ComparePeriod, string> = { week: 'Week', month: 'Month', year: 'Year' };
+
+function periodLabel(period: ComparePeriod, from: string) {
+  const d = new Date(`${from}T00:00:00Z`);
+  const fmt = (o: Intl.DateTimeFormatOptions) => d.toLocaleDateString('en-IN', { ...o, timeZone: 'UTC' });
+  if (period === 'week') return fmt({ day: 'numeric', month: 'short' });
+  if (period === 'month') return fmt({ month: 'short', year: '2-digit' });
+  return fmt({ year: 'numeric' });
+}
+
+function periodTitle(period: ComparePeriod, row: CompareRow) {
+  if (period === 'week') {
+    const f = (d: string) =>
+      new Date(`${d}T00:00:00Z`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+    return `${f(row.from)} – ${f(row.to)}`;
+  }
+  return period === 'month' ? monthLabel(row.from) : row.from.slice(0, 4);
+}
+
+/** Percent change vs the previous period; null when there is nothing to compare against. */
+function pctChange(cur: number, prev: number | undefined): number | null {
+  return prev ? Math.round(((cur - prev) / prev) * 100) : null;
+}
+
+function Change({ pct, goodWhenUp }: { pct: number | null; goodWhenUp: boolean }) {
+  if (pct === null || pct === 0) return null;
+  const good = pct > 0 === goodWhenUp;
+  return (
+    <small className={`delta ${good ? 'good' : 'bad'}`}>
+      {pct > 0 ? '▲' : '▼'} {Math.abs(pct)}%
+    </small>
+  );
+}
+
+function Compare({ onAuthError }: { onAuthError: OnAuthError }) {
+  const [period, setPeriod] = useState<ComparePeriod>('month');
+  const [rows, setRows] = useState<CompareRow[] | null>(null);
+  const [picked, setPicked] = useState<number | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    setRows(null);
+    setPicked(null);
+    api
+      .compare(period)
+      .then((r) => live && setRows(r))
+      .catch(onAuthError);
+    return () => {
+      live = false;
+    };
+  }, [period, onAuthError]);
+
+  const selected = rows ? (picked ?? rows.length - 1) : 0;
+  const row = rows?.[selected];
+
+  return (
+    <main className="home">
+      <section className="card">
+        <h2 className="card-title">Income vs spending</h2>
+        <div className="tabs three" role="tablist" aria-label="Period">
+          {COMPARE_PERIODS.map((p) => (
+            <button key={p} role="tab" aria-selected={period === p} className={period === p ? 'on' : ''} onClick={() => setPeriod(p)}>
+              {PERIOD_LABELS[p]}
+            </button>
+          ))}
+        </div>
+        {rows ? (
+          <>
+            <CompareChart period={period} rows={rows} selected={selected} onPick={setPicked} />
+            <div className="chart-key">
+              <span className="income-key">Income</span>
+              <span className="spent-key">Spent</span>
+            </div>
+          </>
+        ) : (
+          <div className="skeleton" />
+        )}
+      </section>
+
+      {rows && row && (
+        <>
+          <section className="card">
+            <h2 className="card-title">
+              {periodTitle(period, row)}
+              {row.partial && <span className="muted"> · so far</span>}
+            </h2>
+            <dl className="compare-detail">
+              <div>
+                <dt>Income</dt>
+                <dd className="pos">{formatINR(row.income)}</dd>
+              </div>
+              <div>
+                <dt>Spent</dt>
+                <dd>{formatINR(row.spent)}</dd>
+              </div>
+              <div>
+                <dt>Invested &amp; saved</dt>
+                <dd>{formatINR(row.invested)}</dd>
+              </div>
+              <div>
+                <dt>Left over</dt>
+                <dd className={row.saved < 0 ? 'neg' : ''}>{formatINR(row.saved)}</dd>
+              </div>
+            </dl>
+          </section>
+
+          <section className="card">
+            <h2 className="card-title">By {period}</h2>
+            <table className="compare-table">
+              <thead>
+                <tr>
+                  <th></th>
+                  <th>Income</th>
+                  <th>Spent</th>
+                  <th>Invested</th>
+                  <th>Left</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[...rows].reverse().map((r, k) => {
+                  const idx = rows.length - 1 - k;
+                  const prev = rows[idx - 1];
+                  return (
+                    <tr key={r.from} className={idx === selected ? 'sel' : ''} onClick={() => setPicked(idx)}>
+                      <th scope="row">
+                        {periodLabel(period, r.from)}
+                        {r.partial && <small className="muted">so far</small>}
+                      </th>
+                      <td>
+                        {compactINR(r.income)}
+                        {!r.partial && <Change pct={pctChange(r.income, prev?.income)} goodWhenUp />}
+                      </td>
+                      <td>
+                        {compactINR(r.spent)}
+                        {!r.partial && <Change pct={pctChange(r.spent, prev?.spent)} goodWhenUp={false} />}
+                      </td>
+                      <td>{compactINR(r.invested)}</td>
+                      <td className={r.saved < 0 ? 'neg' : ''}>{compactINR(r.saved)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            <p className="muted small">Change is versus the period before. The current period is still in progress.</p>
+          </section>
+        </>
+      )}
+    </main>
+  );
+}
+
+function CompareChart({
+  period,
+  rows,
+  selected,
+  onPick,
+}: {
+  period: ComparePeriod;
+  rows: CompareRow[];
+  selected: number;
+  onPick: (i: number) => void;
+}) {
+  const W = 320;
+  const H = 190;
+  const top = 18;
+  const bottom = 26;
+  const plot = H - top - bottom;
+  const max = Math.max(1, ...rows.flatMap((r) => [r.income, r.spent]));
+  const slot = W / rows.length;
+  const bw = Math.min(26, slot * 0.34);
+  const h = (v: number) => (v / max) * plot;
+  const base = top + plot;
+
+  return (
+    <svg className="compare-chart" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Income and spending by ${period}`}>
+      <line x1="0" x2={W} y1={base} y2={base} className="axis" />
+      {rows.map((r, i) => {
+        const cx = slot * i + slot / 2;
+        const on = i === selected;
+        return (
+          <g key={r.from} className={`bars${r.partial ? ' partial' : ''}${on ? ' on' : ''}`} onClick={() => onPick(i)}>
+            <rect x={slot * i} y="0" width={slot} height={H} className="hit" />
+            {on && <rect x={slot * i + 2} y="2" width={slot - 4} height={H - 4} rx="8" className="sel-bg" />}
+            <rect x={cx - bw - 1} y={base - h(r.income)} width={bw} height={Math.max(h(r.income), r.income ? 2 : 0)} rx="3" className="bar-income" />
+            <rect x={cx + 1} y={base - h(r.spent)} width={bw} height={Math.max(h(r.spent), r.spent ? 2 : 0)} rx="3" className="bar-spent" />
+            {on && (
+              <text x={cx} y={Math.max(11, base - h(Math.max(r.income, r.spent)) - 5)} textAnchor="middle" className="val">
+                {compactINR(Math.max(r.income, r.spent))}
+              </text>
+            )}
+            <text x={cx} y={H - 8} textAnchor="middle" className="tick">
+              {periodLabel(period, r.from)}
+              {r.partial ? '*' : ''}
+            </text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
 // ---- Icons ---------------------------------------------------------------------
+
+function ChartIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+      <path d="M5 20V11M12 20V4M19 20v-6" />
+    </svg>
+  );
+}
 
 function GearIcon() {
   return (

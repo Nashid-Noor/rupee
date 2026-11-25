@@ -294,3 +294,35 @@ label { display: block; font-size: 0.85rem; font-weight: 600; margin: 10px 0 4px
 .pct span { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: var(--muted); font-weight: 600; }
 .caps-foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
 .caps-foot .error { margin: 0; }
+
+/* ---- Compare ---- */
+.top-actions { display: flex; gap: 8px; }
+.tabs.three { grid-template-columns: repeat(3, 1fr); }
+.compare-chart { width: 100%; height: auto; display: block; user-select: none; -webkit-tap-highlight-color: transparent; }
+.compare-chart .axis { stroke: var(--line); stroke-width: 1; }
+.compare-chart .hit { fill: transparent; cursor: pointer; }
+.compare-chart .sel-bg { fill: var(--field); }
+.compare-chart .bar-income { fill: var(--income); }
+.compare-chart .bar-spent { fill: var(--wants); }
+.compare-chart .partial .bar-income, .compare-chart .partial .bar-spent { opacity: 0.5; }
+.compare-chart .tick { fill: var(--muted); font-size: 10px; }
+.compare-chart .on .tick { fill: var(--fg); font-weight: 700; }
+.compare-chart .val { fill: var(--fg); font-size: 10px; font-weight: 700; }
+.chart-key { display: flex; gap: 16px; justify-content: center; margin-top: 8px; font-size: 0.85rem; color: var(--muted); }
+.chart-key span::before { content: ''; display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; background: var(--income); }
+.chart-key .spent-key::before { background: var(--wants); }
+.compare-detail { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 0; }
+.compare-detail dt { font-size: 0.8rem; color: var(--muted); }
+.compare-detail dd { margin: 2px 0 0; font-size: 1.2rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.compare-detail .pos { color: var(--income); }
+.neg { color: var(--danger); }
+.compare-table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: 0.9rem; }
+.compare-table th, .compare-table td { padding: 8px 4px; text-align: right; border-top: 1px solid var(--line); vertical-align: top; }
+.compare-table thead th { border-top: 0; color: var(--muted); font-size: 0.78rem; font-weight: 600; }
+.compare-table tbody th { text-align: left; font-weight: 650; white-space: nowrap; }
+.compare-table tbody tr { cursor: pointer; }
+.compare-table tr.sel { background: var(--field); }
+.compare-table small { display: block; font-size: 0.72rem; }
+.delta.good { color: var(--income); }
+.delta.bad { color: var(--warn); }
+.small { font-size: 0.8rem; margin: 10px 0 0; }
