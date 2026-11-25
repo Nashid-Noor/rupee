@@ -16,6 +16,7 @@ import {
   isoDate,
   listQuery,
   rangeQuery,
+  weeksQuery,
 } from '../shared/schema';
 import {
   SESSION_COOKIE,
@@ -29,7 +30,7 @@ import {
 import type { Env } from './env';
 import { addExpense, deleteExpense, listExpenses, listTags, tagBreakdown, updateExpense } from './expenses';
 import { addIncome, deleteIncome, listIncome, updateIncome } from './income';
-import { getComparison } from './compare';
+import { getComparison, getWeeklyComparison } from './compare';
 import { getCaps, getSummary, setCaps } from './summary';
 
 const app = new Hono<{ Bindings: Env }>();
@@ -117,6 +118,12 @@ app.get('/api/compare', async (c) => {
   const q = compareQuery.safeParse(c.req.query());
   if (!q.success) return zodError(c, q.error);
   return c.json(await getComparison(c.env.DB, q.data.period, q.data.count));
+});
+
+app.get('/api/compare/weeks', async (c) => {
+  const q = weeksQuery.safeParse(c.req.query());
+  if (!q.success) return zodError(c, q.error);
+  return c.json(await getWeeklyComparison(c.env.DB, q.data.month));
 });
 
 // ---- Tags ------------------------------------------------------------------

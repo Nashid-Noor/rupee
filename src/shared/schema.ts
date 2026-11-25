@@ -272,9 +272,30 @@ export interface CompareRow {
   to: string;
   income: number;
   spent: number; // needs + wants
-  invested: number; // investment + savings
-  saved: number; // income − spent − invested
+  investment: number;
+  savings: number;
+  leftOver: number; // income − spent − investment − savings
   partial: boolean; // the current, unfinished period
+}
+
+// ---- Weekly breakdown (one month, split by week) --------------------------------------
+
+export const weeksQuery = z.object({ month: isoDate.optional() });
+
+export interface WeekBreakdown {
+  from: string; // clamped to the month
+  to: string;
+  needs: number;
+  wants: number;
+  investment: number;
+  savings: number;
+  partial: boolean; // contains today
+}
+
+export interface WeeklyComparison {
+  month: string; // first day of the month, YYYY-MM-01
+  income: number; // the month's total income
+  weeks: WeekBreakdown[]; // weeks touching the month, cut at the 1st and the last day
 }
 
 /** 1250 → ₹1.3k, 125000 → ₹1.25L, 12500000 → ₹1.25Cr. For tight spaces like chart axes. */

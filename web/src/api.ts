@@ -2,6 +2,7 @@ import type {
   Caps,
   CompareRow,
   ComparePeriod,
+  WeeklyComparison,
   Expense,
   ExpenseInput,
   Income,
@@ -54,6 +55,7 @@ export const api = {
 
   summary: (from: string, to: string) => req<Summary>(`/api/summary?${qs({ from, to })}`),
   compare: (period: ComparePeriod) => req<CompareRow[]>(`/api/compare?${qs({ period })}`),
+  compareWeeks: (month: string) => req<WeeklyComparison>(`/api/compare/weeks?${qs({ month })}`),
   tags: () => req<{ tag: string; count: number }[]>('/api/tags'),
   tagBreakdown: (from: string, to: string) => req<TagTotal[]>(`/api/tags/breakdown?${qs({ from, to })}`),
 

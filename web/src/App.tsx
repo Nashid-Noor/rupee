@@ -10,6 +10,8 @@ import {
   type Category,
   type ComparePeriod,
   type CompareRow,
+  type WeekBreakdown,
+  type WeeklyComparison,
   COMPARE_PERIODS,
   type Expense,
   type ExpenseInput,
@@ -1058,15 +1060,41 @@ function Change({ pct, goodWhenUp }: { pct: number | null; goodWhenUp: boolean }
   );
 }
 
+function PeriodTabs({ period, onPeriod }: { period: ComparePeriod; onPeriod: (p: ComparePeriod) => void }) {
+  return (
+    <div className="tabs three" role="tablist" aria-label="Period">
+      {COMPARE_PERIODS.map((p) => (
+        <button key={p} role="tab" aria-selected={period === p} className={period === p ? 'on' : ''} onClick={() => onPeriod(p)}>
+          {PERIOD_LABELS[p]}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function Compare({ onAuthError }: { onAuthError: OnAuthError }) {
   const [period, setPeriod] = useState<ComparePeriod>('month');
+  return period === 'week' ? (
+    <WeeklyView period={period} onPeriod={setPeriod} onAuthError={onAuthError} />
+  ) : (
+    <PeriodView key={period} period={period} onPeriod={setPeriod} onAuthError={onAuthError} />
+  );
+}
+
+function PeriodView({
+  period,
+  onPeriod,
+  onAuthError,
+}: {
+  period: ComparePeriod;
+  onPeriod: (p: ComparePeriod) => void;
+  onAuthError: OnAuthError;
+}) {
   const [rows, setRows] = useState<CompareRow[] | null>(null);
   const [picked, setPicked] = useState<number | null>(null);
 
   useEffect(() => {
     let live = true;
-    setRows(null);
-    setPicked(null);
     api
       .compare(period)
       .then((r) => live && setRows(r))
@@ -1083,13 +1111,7 @@ function Compare({ onAuthError }: { onAuthError: OnAuthError }) {
     <main className="home">
       <section className="card">
         <h2 className="card-title">Income vs spending</h2>
-        <div className="tabs three" role="tablist" aria-label="Period">
-          {COMPARE_PERIODS.map((p) => (
-            <button key={p} role="tab" aria-selected={period === p} className={period === p ? 'on' : ''} onClick={() => setPeriod(p)}>
-              {PERIOD_LABELS[p]}
-            </button>
-          ))}
-        </div>
+        <PeriodTabs period={period} onPeriod={onPeriod} />
         {rows ? (
           <>
             <CompareChart period={period} rows={rows} selected={selected} onPick={setPicked} />
@@ -1120,12 +1142,20 @@ function Compare({ onAuthError }: { onAuthError: OnAuthError }) {
                 <dd>{formatINR(row.spent)}</dd>
               </div>
               <div>
-                <dt>Invested &amp; saved</dt>
-                <dd>{formatINR(row.invested)}</dd>
+                <dt>Investment</dt>
+                <dd>{formatINR(row.investment)}</dd>
+              </div>
+              <div>
+                <dt>Savings</dt>
+                <dd>{formatINR(row.savings)}</dd>
               </div>
               <div>
                 <dt>Left over</dt>
-                <dd className={row.saved < 0 ? 'neg' : ''}>{formatINR(row.saved)}</dd>
+                <dd className={row.leftOver < 0 ? 'neg' : ''}>{formatINR(row.leftOver)}</dd>
+              </div>
+              <div>
+                <dt>% of income spent</dt>
+                <dd>{row.income ? `${Math.round((row.spent / row.income) * 100)}%` : '—'}</dd>
               </div>
             </dl>
           </section>
@@ -1138,7 +1168,8 @@ function Compare({ onAuthError }: { onAuthError: OnAuthError }) {
                   <th></th>
                   <th>Income</th>
                   <th>Spent</th>
-                  <th>Invested</th>
+                  <th>Invest</th>
+                  <th>Savings</th>
                   <th>Left</th>
                 </tr>
               </thead>
@@ -1160,8 +1191,9 @@ function Compare({ onAuthError }: { onAuthError: OnAuthError }) {
                         {compactINR(r.spent)}
                         {!r.partial && <Change pct={pctChange(r.spent, prev?.spent)} goodWhenUp={false} />}
                       </td>
-                      <td>{compactINR(r.invested)}</td>
-                      <td className={r.saved < 0 ? 'neg' : ''}>{compactINR(r.saved)}</td>
+                      <td>{compactINR(r.investment)}</td>
+                      <td>{compactINR(r.savings)}</td>
+                      <td className={r.leftOver < 0 ? 'neg' : ''}>{compactINR(r.leftOver)}</td>
                     </tr>
                   );
                 })}
@@ -1172,6 +1204,183 @@ function Compare({ onAuthError }: { onAuthError: OnAuthError }) {
         </>
       )}
     </main>
+  );
+}
+
+const WEEK_SERIES = [
+  { key: 'needs', label: CATEGORY_LABELS.needs },
+  { key: 'wants', label: CATEGORY_LABELS.wants },
+  { key: 'investment', label: CATEGORY_LABELS.investment },
+  { key: 'savings', label: CATEGORY_LABELS.savings },
+] as const;
+
+const weekTotal = (w: WeekBreakdown) => w.needs + w.wants + w.investment + w.savings;
+const dayNum = (d: string) => Number(d.slice(8));
+const weekDays = (w: WeekBreakdown) => (w.from === w.to ? `${dayNum(w.from)}` : `${dayNum(w.from)}–${dayNum(w.to)}`);
+
+function WeeklyView({
+  period,
+  onPeriod,
+  onAuthError,
+}: {
+  period: ComparePeriod;
+  onPeriod: (p: ComparePeriod) => void;
+  onAuthError: OnAuthError;
+}) {
+  const thisMonth = monthRange(todayIST()).from;
+  const [month, setMonth] = useState(thisMonth);
+  const [data, setData] = useState<WeeklyComparison | null>(null);
+  const [picked, setPicked] = useState<number | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    setData(null);
+    setPicked(null);
+    api
+      .compareWeeks(month)
+      .then((d) => live && setData(d))
+      .catch(onAuthError);
+    return () => {
+      live = false;
+    };
+  }, [month, onAuthError]);
+
+  const spent = data ? data.weeks.reduce((s, w) => s + w.needs + w.wants, 0) : 0;
+  const invested = data ? data.weeks.reduce((s, w) => s + w.investment, 0) : 0;
+  const saved = data ? data.weeks.reduce((s, w) => s + w.savings, 0) : 0;
+  const left = data ? data.income - spent - invested - saved : 0;
+  const selected = data ? (picked ?? Math.max(0, data.weeks.findIndex((w) => w.partial))) : 0;
+  const week = data?.weeks[selected];
+
+  return (
+    <main className="home">
+      <section className="card">
+        <h2 className="card-title">Income vs spending</h2>
+        <PeriodTabs period={period} onPeriod={onPeriod} />
+        <div className="month-nav">
+          <button className="icon-btn" aria-label="Previous month" onClick={() => setMonth(shiftMonth(month, -1))}>
+            ‹
+          </button>
+          <h2>{monthLabel(month)}</h2>
+          <button className="icon-btn" aria-label="Next month" disabled={month >= thisMonth} onClick={() => setMonth(shiftMonth(month, 1))}>
+            ›
+          </button>
+        </div>
+        {data ? (
+          <>
+            <dl className="compare-detail month-totals">
+              <div>
+                <dt>Income this month</dt>
+                <dd className="pos">{formatINR(data.income)}</dd>
+              </div>
+              <div>
+                <dt>Left over</dt>
+                <dd className={left < 0 ? 'neg' : ''}>{formatINR(left)}</dd>
+              </div>
+            </dl>
+            <WeeklyChart weeks={data.weeks} selected={selected} onPick={setPicked} />
+            <div className="chart-key">
+              {WEEK_SERIES.map((x) => (
+                <span key={x.key} className={`c-${x.key}`}>
+                  {x.label}
+                </span>
+              ))}
+            </div>
+          </>
+        ) : (
+          <div className="skeleton" />
+        )}
+      </section>
+
+      {data && week && (
+        <>
+          <section className="card">
+            <h2 className="card-title">
+              {new Date(`${week.from}T00:00:00Z`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', timeZone: 'UTC' })}
+              {week.from !== week.to &&
+                ` – ${new Date(`${week.to}T00:00:00Z`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', timeZone: 'UTC' })}`}
+              {week.partial && <span className="muted"> · so far</span>}
+            </h2>
+            <dl className="compare-detail">
+              {WEEK_SERIES.map((x) => (
+                <div key={x.key} className={`c-${x.key}`}>
+                  <dt className="with-dot">
+                    <i className="dot" />
+                    {x.label}
+                  </dt>
+                  <dd>{formatINR(week[x.key])}</dd>
+                </div>
+              ))}
+            </dl>
+          </section>
+
+          <section className="card">
+            <h2 className="card-title">Month so far</h2>
+            <dl className="compare-detail">
+              <div>
+                <dt>Spent (needs + wants)</dt>
+                <dd>{formatINR(spent)}</dd>
+              </div>
+              <div>
+                <dt>% of income spent</dt>
+                <dd>{data.income ? `${Math.round((spent / data.income) * 100)}%` : '—'}</dd>
+              </div>
+              <div>
+                <dt>Investment</dt>
+                <dd>{formatINR(invested)}</dd>
+              </div>
+              <div>
+                <dt>Savings</dt>
+                <dd>{formatINR(saved)}</dd>
+              </div>
+            </dl>
+          </section>
+        </>
+      )}
+    </main>
+  );
+}
+
+function WeeklyChart({ weeks, selected, onPick }: { weeks: WeekBreakdown[]; selected: number; onPick: (i: number) => void }) {
+  const W = 320;
+  const H = 190;
+  const top = 18;
+  const bottom = 26;
+  const plot = H - top - bottom;
+  const max = Math.max(1, ...weeks.map(weekTotal));
+  const slot = W / weeks.length;
+  const bw = Math.min(40, slot * 0.55);
+  const base = top + plot;
+
+  return (
+    <svg className="compare-chart" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Spending by week, split by category">
+      <line x1="0" x2={W} y1={base} y2={base} className="axis" />
+      {weeks.map((w, i) => {
+        const cx = slot * i + slot / 2;
+        const on = i === selected;
+        let y = base;
+        return (
+          <g key={w.from} className={`bars${w.partial ? ' partial' : ''}${on ? ' on' : ''}`} onClick={() => onPick(i)}>
+            <rect x={slot * i} y="0" width={slot} height={H} className="hit" />
+            {on && <rect x={slot * i + 2} y="2" width={slot - 4} height={H - 4} rx="8" className="sel-bg" />}
+            {WEEK_SERIES.map((x) => {
+              const h = (w[x.key] / max) * plot;
+              y -= h;
+              return h > 0 ? <rect key={x.key} x={cx - bw / 2} y={y} width={bw} height={Math.max(h, 1.5)} className={`seg c-${x.key}`} /> : null;
+            })}
+            {on && weekTotal(w) > 0 && (
+              <text x={cx} y={Math.max(11, y - 5)} textAnchor="middle" className="val">
+                {compactINR(weekTotal(w))}
+              </text>
+            )}
+            <text x={cx} y={H - 8} textAnchor="middle" className="tick">
+              {weekDays(w)}
+              {w.partial ? '*' : ''}
+            </text>
+          </g>
+        );
+      })}
+    </svg>
   );
 }
 

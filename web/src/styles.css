@@ -326,3 +326,9 @@ label { display: block; font-size: 0.85rem; font-weight: 600; margin: 10px 0 4px
 .delta.good { color: var(--income); }
 .delta.bad { color: var(--warn); }
 .small { font-size: 0.8rem; margin: 10px 0 0; }
+.compare-detail.month-totals { margin-bottom: 14px; }
+.with-dot { display: flex; align-items: center; gap: 6px; }
+.compare-chart .seg { fill: var(--c); }
+.compare-chart .partial .seg { opacity: 0.55; }
+.chart-key span.c-needs::before, .chart-key span.c-wants::before, .chart-key span.c-investment::before, .chart-key span.c-savings::before { background: var(--c); }
+.chart-key { flex-wrap: wrap; row-gap: 4px; }
