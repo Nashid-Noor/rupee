@@ -298,10 +298,10 @@ export interface WeeklyComparison {
   weeks: WeekBreakdown[]; // always 4; the last one takes any leftover days
 }
 
-/** 1250 → ₹1.3k, 125000 → ₹1.25L, 12500000 → ₹1.25Cr. For tight spaces like chart axes. */
-export function compactINR(n: number): string {
+/** 1250 → ₹1.3k, 125000 → ₹1.25L, 12500000 → ₹1.25Cr. Pass `symbol: false` to drop the ₹ in tight tables. */
+export function compactINR(n: number, symbol = true): string {
   const a = Math.abs(n);
-  const f = (v: number, u: string) => `${n < 0 ? '-' : ''}₹${Number(v.toFixed(2))}${u}`;
+  const f = (v: number, u: string) => `${n < 0 ? '-' : ''}${symbol ? '₹' : ''}${Number(v.toFixed(2))}${u}`;
   if (a >= 1e7) return f(a / 1e7, 'Cr');
   if (a >= 1e5) return f(a / 1e5, 'L');
   if (a >= 1e3) return f(a / 1e3, 'k');

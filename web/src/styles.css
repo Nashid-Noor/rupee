@@ -333,3 +333,10 @@ label { display: block; font-size: 0.85rem; font-weight: 600; margin: 10px 0 4px
 .compare-chart .partial .seg { opacity: 0.55; }
 .chart-key span.c-needs::before, .chart-key span.c-wants::before, .chart-key span.c-investment::before, .chart-key span.c-savings::before { background: var(--c); }
 .chart-key { flex-wrap: wrap; row-gap: 4px; }
+.compare-table { table-layout: fixed; }
+.compare-table th, .compare-table td { padding-left: 2px; padding-right: 2px; font-size: 0.8rem; overflow-wrap: anywhere; }
+.compare-table thead th { font-size: 0.7rem; }
+.compare-table tbody th { width: 17%; white-space: normal; }
+.week-table tbody th { width: 20%; }
+.week-table .total-cell { font-weight: 700; }
+.small-unit { font-size: 0.8rem; font-weight: 500; }

@@ -1161,7 +1161,7 @@ function PeriodView({
           </section>
 
           <section className="card">
-            <h2 className="card-title">By {period}</h2>
+            <h2 className="card-title">By {period} <span className="muted small-unit">(₹)</span></h2>
             <table className="compare-table">
               <thead>
                 <tr>
@@ -1184,16 +1184,16 @@ function PeriodView({
                         {r.partial && <small className="muted">so far</small>}
                       </th>
                       <td>
-                        {compactINR(r.income)}
+                        {compactINR(r.income, false)}
                         {!r.partial && <Change pct={pctChange(r.income, prev?.income)} goodWhenUp />}
                       </td>
                       <td>
-                        {compactINR(r.spent)}
+                        {compactINR(r.spent, false)}
                         {!r.partial && <Change pct={pctChange(r.spent, prev?.spent)} goodWhenUp={false} />}
                       </td>
-                      <td>{compactINR(r.investment)}</td>
-                      <td>{compactINR(r.savings)}</td>
-                      <td className={r.leftOver < 0 ? 'neg' : ''}>{compactINR(r.leftOver)}</td>
+                      <td>{compactINR(r.investment, false)}</td>
+                      <td>{compactINR(r.savings, false)}</td>
+                      <td className={r.leftOver < 0 ? 'neg' : ''}>{compactINR(r.leftOver, false)}</td>
                     </tr>
                   );
                 })}
@@ -1230,12 +1230,9 @@ function WeeklyView({
   const thisMonth = monthRange(todayIST()).from;
   const [month, setMonth] = useState(thisMonth);
   const [data, setData] = useState<WeeklyComparison | null>(null);
-  const [picked, setPicked] = useState<number | null>(null);
-
   useEffect(() => {
     let live = true;
     setData(null);
-    setPicked(null);
     api
       .compareWeeks(month)
       .then((d) => live && setData(d))
@@ -1249,8 +1246,6 @@ function WeeklyView({
   const invested = data ? data.weeks.reduce((s, w) => s + w.investment, 0) : 0;
   const saved = data ? data.weeks.reduce((s, w) => s + w.savings, 0) : 0;
   const left = data ? data.income - spent - invested - saved : 0;
-  const selected = data ? (picked ?? Math.max(0, data.weeks.findIndex((w) => w.partial))) : 0;
-  const week = data?.weeks[selected];
 
   return (
     <main className="home">
@@ -1278,7 +1273,7 @@ function WeeklyView({
                 <dd className={left < 0 ? 'neg' : ''}>{formatINR(left)}</dd>
               </div>
             </dl>
-            <WeeklyChart weeks={data.weeks} selected={selected} onPick={setPicked} />
+            <WeeklyChart weeks={data.weeks} />
             <div className="chart-key">
               {WEEK_SERIES.map((x) => (
                 <span key={x.key} className={`c-${x.key}`}>
@@ -1292,26 +1287,37 @@ function WeeklyView({
         )}
       </section>
 
-      {data && week && (
+      {data && (
         <>
           <section className="card">
             <h2 className="card-title">
-              {new Date(`${week.from}T00:00:00Z`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', timeZone: 'UTC' })}
-              {week.from !== week.to &&
-                ` – ${new Date(`${week.to}T00:00:00Z`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', timeZone: 'UTC' })}`}
-              {week.partial && <span className="muted"> · so far</span>}
+              By week <span className="muted small-unit">(₹)</span>
             </h2>
-            <dl className="compare-detail">
-              {WEEK_SERIES.map((x) => (
-                <div key={x.key} className={`c-${x.key}`}>
-                  <dt className="with-dot">
-                    <i className="dot" />
-                    {x.label}
-                  </dt>
-                  <dd>{formatINR(week[x.key])}</dd>
-                </div>
-              ))}
-            </dl>
+            <table className="compare-table week-table">
+              <thead>
+                <tr>
+                  <th></th>
+                  {WEEK_SERIES.map((x) => (
+                    <th key={x.key}>{x.key === 'investment' ? 'Invest' : x.label}</th>
+                  ))}
+                  <th>Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.weeks.map((w) => (
+                  <tr key={w.from}>
+                    <th scope="row">
+                      {weekDays(w)}
+                      {w.partial && <small className="muted">so far</small>}
+                    </th>
+                    {WEEK_SERIES.map((x) => (
+                      <td key={x.key}>{compactINR(w[x.key], false)}</td>
+                    ))}
+                    <td className="total-cell">{compactINR(weekTotal(w), false)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </section>
 
           <section className="card">
@@ -1341,7 +1347,7 @@ function WeeklyView({
   );
 }
 
-function WeeklyChart({ weeks, selected, onPick }: { weeks: WeekBreakdown[]; selected: number; onPick: (i: number) => void }) {
+function WeeklyChart({ weeks }: { weeks: WeekBreakdown[] }) {
   const W = 320;
   const H = 190;
   const top = 18;
@@ -1357,12 +1363,9 @@ function WeeklyChart({ weeks, selected, onPick }: { weeks: WeekBreakdown[]; sele
       <line x1="0" x2={W} y1={base} y2={base} className="axis" />
       {weeks.map((w, i) => {
         const cx = slot * i + slot / 2;
-        const on = i === selected;
         let y = base;
         return (
-          <g key={w.from} className={`bars${w.partial ? ' partial' : ''}${on ? ' on' : ''}`} onClick={() => onPick(i)}>
-            <rect x={slot * i} y="0" width={slot} height={H} className="hit" />
-            {on && <rect x={slot * i + 2} y="2" width={slot - 4} height={H - 4} rx="8" className="sel-bg" />}
+          <g key={w.from} className={`bars${w.partial ? ' partial' : ''}`}>
             {WEEK_SERIES.map((x) => {
               const h = (w[x.key] / max) * plot;
               y -= h;
