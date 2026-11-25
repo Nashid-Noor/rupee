@@ -9,9 +9,7 @@ import {
   monthRange,
   periodRange,
   shiftPeriod,
-  shiftWeek,
   todayIST,
-  weekRange,
 } from '../shared/schema';
 import { fromPaise } from './expenses';
 
@@ -72,7 +70,10 @@ export async function getComparison(
   });
 }
 
-/** One month's income plus spending per week, by category. Weeks are cut at the month edges. */
+/** Days 1–7, 8–14, 15–21 and 22–end of the month (the last block takes any leftover days). */
+const WEEKS_PER_MONTH = 4;
+
+/** One month's income plus spending per week, by category. */
 export async function getWeeklyComparison(db: D1Database, date?: string): Promise<WeeklyComparison> {
   const today = todayIST();
   const month = monthRange(date ?? today);
@@ -80,27 +81,31 @@ export async function getWeeklyComparison(db: D1Database, date?: string): Promis
   const [spend, income] = await db.batch([
     db
       .prepare(
-        `SELECT ${bucketSql('week', 'spent_on')} AS b, category, SUM(amount_paise) AS paise
-         FROM expenses WHERE spent_on BETWEEN ? AND ? GROUP BY b, category`,
+        `SELECT CAST(substr(spent_on, 9, 2) AS INTEGER) AS day, category, SUM(amount_paise) AS paise
+         FROM expenses WHERE spent_on BETWEEN ? AND ? GROUP BY day, category`,
       )
       .bind(month.from, month.to),
     db.prepare('SELECT COALESCE(SUM(amount_paise), 0) AS p FROM incomes WHERE received_on BETWEEN ? AND ?').bind(month.from, month.to),
   ]);
-  const rows = spend.results as { b: string; category: Category; paise: number }[];
+  const rows = spend.results as { day: number; category: Category; paise: number }[];
+  const lastDay = Number(month.to.slice(8));
+  const ym = month.from.slice(0, 8);
+  const dayStr = (d: number) => `${ym}${String(d).padStart(2, '0')}`;
 
-  const weeks: WeekBreakdown[] = [];
-  for (let start = weekRange(month.from).from; start <= month.to; start = shiftWeek(start, 1)) {
-    const week = weekRange(start);
-    const paise = (c: Category) => fromPaise(rows.find((r) => r.b === start && r.category === c)?.paise ?? 0);
-    weeks.push({
-      from: week.from < month.from ? month.from : week.from,
-      to: week.to > month.to ? month.to : week.to,
+  const weeks: WeekBreakdown[] = Array.from({ length: WEEKS_PER_MONTH }, (_, i) => {
+    const first = i * 7 + 1;
+    const last = i === WEEKS_PER_MONTH - 1 ? lastDay : first + 6;
+    const paise = (c: Category) =>
+      fromPaise(rows.filter((r) => r.category === c && r.day >= first && r.day <= last).reduce((s, r) => s + r.paise, 0));
+    return {
+      from: dayStr(first),
+      to: dayStr(last),
       needs: paise('needs'),
       wants: paise('wants'),
       investment: paise('investment'),
       savings: paise('savings'),
-      partial: week.from <= today && today <= week.to,
-    });
-  }
+      partial: dayStr(first) <= today && today <= dayStr(last),
+    };
+  });
   return { month: month.from, income: fromPaise((income.results[0] as { p: number }).p), weeks };
 }

@@ -307,7 +307,8 @@ label { display: block; font-size: 0.85rem; font-weight: 600; margin: 10px 0 4px
 .compare-chart .partial .bar-income, .compare-chart .partial .bar-spent { opacity: 0.5; }
 .compare-chart .tick { fill: var(--muted); font-size: 10px; }
 .compare-chart .on .tick { fill: var(--fg); font-weight: 700; }
-.compare-chart .val { fill: var(--fg); font-size: 10px; font-weight: 700; }
+.compare-chart .val { fill: var(--muted); font-size: 10px; font-weight: 600; }
+.compare-chart .on .val { fill: var(--fg); font-weight: 700; }
 .chart-key { display: flex; gap: 16px; justify-content: center; margin-top: 8px; font-size: 0.85rem; color: var(--muted); }
 .chart-key span::before { content: ''; display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; background: var(--income); }
 .chart-key .spent-key::before { background: var(--wants); }

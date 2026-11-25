@@ -1368,7 +1368,7 @@ function WeeklyChart({ weeks, selected, onPick }: { weeks: WeekBreakdown[]; sele
               y -= h;
               return h > 0 ? <rect key={x.key} x={cx - bw / 2} y={y} width={bw} height={Math.max(h, 1.5)} className={`seg c-${x.key}`} /> : null;
             })}
-            {on && weekTotal(w) > 0 && (
+            {weekTotal(w) > 0 && (
               <text x={cx} y={Math.max(11, y - 5)} textAnchor="middle" className="val">
                 {compactINR(weekTotal(w))}
               </text>

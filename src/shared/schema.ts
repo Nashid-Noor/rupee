@@ -283,7 +283,7 @@ export interface CompareRow {
 export const weeksQuery = z.object({ month: isoDate.optional() });
 
 export interface WeekBreakdown {
-  from: string; // clamped to the month
+  from: string; // days 1–7, 8–14, 15–21, 22–end of month
   to: string;
   needs: number;
   wants: number;
@@ -295,7 +295,7 @@ export interface WeekBreakdown {
 export interface WeeklyComparison {
   month: string; // first day of the month, YYYY-MM-01
   income: number; // the month's total income
-  weeks: WeekBreakdown[]; // weeks touching the month, cut at the 1st and the last day
+  weeks: WeekBreakdown[]; // always 4; the last one takes any leftover days
 }
 
 /** 1250 → ₹1.3k, 125000 → ₹1.25L, 12500000 → ₹1.25Cr. For tight spaces like chart axes. */
